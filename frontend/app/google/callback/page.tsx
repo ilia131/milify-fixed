@@ -185,8 +185,7 @@ export default function GoogleCallbackPage() {
       itp_support: true,
     });
 
-    // استفاده از any برای دور زدن مشکل تایپ
-    (window.google.accounts.id as any).prompt();
+    window.google.accounts.id.prompt();
   }, [handleGoogleSuccess]);
 
   // =====================================================
@@ -214,7 +213,7 @@ export default function GoogleCallbackPage() {
       return () => {
         existingScript.removeEventListener("load", handleLoad);
         if (window.google?.accounts?.id) {
-          (window.google.accounts.id as any).cancel?.();
+          window.google.accounts.id.cancel?.();
         }
       };
     }
@@ -236,7 +235,7 @@ export default function GoogleCallbackPage() {
 
     return () => {
       if (window.google?.accounts?.id) {
-        (window.google.accounts.id as any).cancel?.();
+        window.google.accounts.id.cancel?.();
       }
     };
   }, [initializeGoogle]);

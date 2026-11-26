@@ -1,7 +1,10 @@
 import type { MetadataRoute } from "next";
+import { connection } from "next/server";
 
 const BASE_URL = "https://milify.ir";
-const API_URL = "https://api.milify.ir";
+const API_URL = (
+  process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.milify.ir"
+).replace(/\/+$/, "");
 
 interface SitemapArtist {
   uuid: string;
@@ -76,6 +79,7 @@ async function getSitemapData(): Promise<SitemapData> {
 ========================================================= */
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await connection();
   const data = await getSitemapData();
 
   /* =======================================================
@@ -108,10 +112,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const artistPages: MetadataRoute.Sitemap =
     data.artists
-      .filter((artist) => artist.uuid)
+      .filter((artist) => artist.artistname)
       .map((artist) => ({
         url: `${BASE_URL}/artist/${encodeURIComponent(
-          artist.uuid
+          artist.artistname
         )}`,
 
         lastModified: artist.updated_at

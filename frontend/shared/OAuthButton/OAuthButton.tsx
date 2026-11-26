@@ -47,6 +47,7 @@ declare global {
             options: Record<string, unknown>
           ) => void;
           cancel: () => void;
+          prompt: () => void;
         };
       };
     };

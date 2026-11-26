@@ -6,6 +6,7 @@ from djoser.views import UserViewSet
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -17,6 +18,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from accounts.models import UserListener
+from .serializers import FavoriteArtistsSerializer
 
 
 class ListenerViewSet(UserViewSet):
@@ -255,6 +257,16 @@ class GoogleTokenLoginView(APIView):
         )
 
 
+
+
+class GoogleProfileCompletionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = FavoriteArtistsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request.user.favorite_artists.set(serializer.validated_data["favorite_artists"])
+        return Response({"detail": "Updated favorite artists.", **serializer.data})
 
 
 def set_token_cookie(response, name, token, max_age):

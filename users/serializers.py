@@ -55,3 +55,8 @@ class CustomUserCreateSerializer(UserCreateSerializer):
         if favorite_artists:
             user.favorite_artists.set(favorite_artists)
         return user
+
+class FavoriteArtistsSerializer(serializers.Serializer):
+    favorite_artists = serializers.SlugRelatedField(
+        many=True, slug_field="artistname", queryset=Artist.objects.all()
+    )

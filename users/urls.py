@@ -1,18 +1,24 @@
-from django.urls import path  , re_path
+from django.urls import path
 from .views import (
     CustomTokenObtainPairView,
     CustomTokenRefreshView,
     CustomTokenVerifyView,
     GoogleTokenLoginView,
+    GoogleProfileCompletionView,
     LogoutView
 )
 
 
-urlpatterns = [  
+urlpatterns = [
     path(
         "google/login/",
         GoogleTokenLoginView.as_view(),
         name="google-token-login",
+    ),
+    path(
+        "google/complete-profile/",
+        GoogleProfileCompletionView.as_view(),
+        name="google-complete-profile",
     ),
     path('jwt/create/', CustomTokenObtainPairView.as_view()),
     path('jwt/refresh/', CustomTokenRefreshView.as_view()),

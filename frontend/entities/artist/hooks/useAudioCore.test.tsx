@@ -17,8 +17,9 @@ test("plays the current signed source and clears it when access is lost", () => 
   const audioRef = { current: audio };
   const mockAccess = jest.mocked(useGetSongSubscriptionAccessQuery);
   mockAccess.mockReturnValue({
-    currentData: { can_play: true, track_url: "https://storage.example/signed" },
+    currentData: { can_play: true, requires_subscription: true, track_url: "https://storage.example/signed" },
     isFetching: false,
+    refetch: jest.fn(),
   } as ReturnType<typeof useGetSongSubscriptionAccessQuery>);
 
   const { rerender } = renderHook(() => useAudioCore(audioRef, song, true, 0.5));
@@ -26,8 +27,9 @@ test("plays the current signed source and clears it when access is lost", () => 
   expect(play).toHaveBeenCalledTimes(1);
 
   mockAccess.mockReturnValue({
-    currentData: { can_play: false },
+    currentData: { can_play: false, requires_subscription: true },
     isFetching: false,
+    refetch: jest.fn(),
   } as ReturnType<typeof useGetSongSubscriptionAccessQuery>);
   rerender();
   expect(audio.hasAttribute("src")).toBe(false);

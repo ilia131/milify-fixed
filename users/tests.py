@@ -6,6 +6,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from accounts.models import UserListener
+from artists.models import Artist
 
 
 @override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
@@ -97,3 +98,35 @@ class RegistrationTests(APITestCase):
         self.assertEqual(response.status_code, 401)
         user.refresh_from_db()
         self.assertFalse(user.is_active)
+
+    def test_new_google_listener_can_save_favorite_artists(self):
+
+        creator = UserListener.objects.create_user(
+            email="artist@example.com", username="artist"
+        )
+        artist = Artist.objects.create(user=creator, artistname="test-artist")
+        verification = Mock(status_code=200)
+        verification.json.return_value = {
+            "aud": "test-client",
+            "iss": "accounts.google.com",
+            "email": "google-listener@example.com",
+            "email_verified": True,
+        }
+        with self.settings(SOCIAL_AUTH_GOOGLE_OAUTH2_KEY="test-client"):
+            with patch("users.views.requests.get", return_value=verification):
+                login = self.client.post(
+                    "/api/google/login/", {"id_token": "test-token"}, format="json"
+                )
+
+        self.assertEqual(login.status_code, 200, login.data)
+        self.assertTrue(login.data["created"])
+        profile = self.client.post(
+            "/api/google/complete-profile/",
+            {"favorite_artists": [artist.artistname]},
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {login.data['access']}",
+        )
+        self.assertEqual(profile.status_code, 200, profile.data)
+        user = UserListener.objects.get(email="google-listener@example.com")
+        self.assertTrue(user.is_active)
+        self.assertEqual(list(user.favorite_artists.all()), [artist])
