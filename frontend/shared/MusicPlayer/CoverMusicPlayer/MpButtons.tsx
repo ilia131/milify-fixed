@@ -1,0 +1,49 @@
+import TitleSaveMp from "@/shared/MusicPlayer/CoverMusicPlayer/TitleSaveMp"
+import BarTimeMp from "@/shared/MusicPlayer/CoverMusicPlayer/BarTimeMp"
+import MpPlayerButtons from "@/shared/MusicPlayer/CoverMusicPlayer/MpPlayerButtons"
+import ShareCastMp from "@/shared/MusicPlayer/CoverMusicPlayer/ShareCastMp"
+import { Song } from "@/redux/features/playerSlice"
+
+
+interface Props {
+  progress: number;
+  currentSong:Song;
+  lowerTime:string, 
+  higherTime:string;
+  handleSeek:(e: React.MouseEvent<HTMLDivElement>) => void
+  buffered:number;
+  setIsOpenLyric:(isOpenLyric : boolean) => void
+  onNext: ()=>void
+  onPrevious :  ()=>void
+  setIsOpenQueue:(isOpenQueue:boolean)=>void
+
+
+}
+
+const MpButtons = ({currentSong , progress , lowerTime ,
+  setIsOpenQueue,
+  higherTime , handleSeek , buffered , setIsOpenLyric , onNext
+  ,  onPrevious 
+
+}:Props) => {
+  return (
+    <div className="w-full h-64 ">
+    <TitleSaveMp currentSong={currentSong}/>
+    <BarTimeMp progress={progress} lowerTime={lowerTime} higherTime={higherTime} handleSeek={handleSeek}
+    buffered={buffered}
+    />
+    <MpPlayerButtons
+     onNext={onNext}
+     onPrevious={onPrevious}
+
+    />
+    <ShareCastMp
+    setIsOpenQueue={setIsOpenQueue}
+
+    setIsOpenLyric={setIsOpenLyric}
+    />
+  </div> 
+  )
+}
+
+export default MpButtons

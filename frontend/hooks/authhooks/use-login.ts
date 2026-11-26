@@ -1,0 +1,112 @@
+import { useAppDispatch } from "@/redux/hook";
+import { useLoginMutation } from "@/redux/services/authApiSlice";
+import { setAuth } from "@/redux/features/authSlice";
+import useSpotifyRouter from "./useSpotifyRouter";
+import { useToast } from "@/components/ToastProvider/ToastProvider";
+
+interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+const setCookie = (
+  name: string,
+  value: string,
+  days = 1
+) => {
+  const date = new Date();
+
+  date.setTime(
+    date.getTime() +
+      days * 24 * 60 * 60 * 1000
+  );
+
+  const expires =
+    "expires=" + date.toUTCString();
+
+  document.cookie =
+    `${name}=${value}; ${expires}; path=/`;
+};
+
+export function saveSession(
+  { access, refresh }: { access: string; refresh: string },
+  dispatch: ReturnType<typeof useAppDispatch>
+) {
+  if (!access || !refresh) {
+    throw new Error("توکن دریافت نشد");
+  }
+
+  localStorage.setItem("access", access);
+  localStorage.setItem("refresh", refresh);
+  setCookie("access", access);
+  setCookie("refresh", refresh);
+  dispatch(setAuth({ access, refresh }));
+}
+
+export default function useLogin() {
+  const { replace } = useSpotifyRouter();
+
+  const { success, error } = useToast();
+
+  const dispatch = useAppDispatch();
+
+  const [login, { isLoading }] =
+    useLoginMutation();
+
+  const onSubmit = async (
+    values: LoginFormData
+  ) => {
+    const { email, password } = values;
+
+    try {
+      const result = await login({
+        email,
+        password,
+      }).unwrap();
+
+      saveSession(result, dispatch);
+
+      // -------------------------
+      // Success
+      // -------------------------
+
+      success(
+        "Your login was successful"
+      );
+
+      // -------------------------
+      // Spotify Router
+      // -------------------------
+
+      replace("/browse");
+
+    } catch (err: unknown) {
+      let errorMsg = "Login failed";
+
+      if (err instanceof Error) {
+        errorMsg = err.message;
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "data" in err
+      ) {
+        const e = err as {
+          data?: {
+            detail?: string;
+          };
+        };
+
+        errorMsg =
+          e.data?.detail ??
+          errorMsg;
+      }
+
+      error(errorMsg);
+    }
+  };
+
+  return {
+    onSubmit,
+    isLoading,
+  };
+}
