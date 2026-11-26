@@ -26,3 +26,6 @@ media/
 *.pem
 *.sqlite3
 *.log
+
+/frontend
+**/__pycache__

@@ -59,3 +59,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run build
 The Next.js production build fetches Vazirmatn from Google Fonts. On systems with a custom trust store, set `NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1` to use trusted system certificates.
 
 Simple JWT uses a database blacklist for rotated refresh tokens and logout. Run `python manage.py flushexpiredtokens` periodically to prune expired rows.
+
+For the production proxy configuration, HTTPS environment settings, credential rotation
+and advertising accounting, see [Production deployment](deploy/production.md).
+Run the development Nginx profile with `docker compose --profile proxy up --build`.
+The proxy listens on loopback port 8080.
