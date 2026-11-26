@@ -30,7 +30,7 @@ class AdminAdvertisementListSerializer(
     spent = serializers.DecimalField(
         source="campaign.spent",
         max_digits=20,
-        decimal_places=2,
+        decimal_places=7,
         read_only=True,
     )
 
@@ -198,6 +198,9 @@ class AdminAdvertisementStatsSerializer(
         max_digits=10,
         decimal_places=2,
     )
+
+    charged_amount = serializers.DecimalField(max_digits=17, decimal_places=7)
+    currency = serializers.CharField()
 
     completed = serializers.IntegerField()
 

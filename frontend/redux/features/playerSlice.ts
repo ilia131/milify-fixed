@@ -32,6 +32,8 @@ type PlayerState = {
   currentIndex: number;
   isPlaying: boolean;
   volume: number;
+  shuffle: boolean;
+  repeatOne: boolean;
   mediaType: "music" | "video" | null;
   
   progress: number;
@@ -48,6 +50,8 @@ const initialState: PlayerState = {
   currentIndex: 0,
   isPlaying: false,
   volume: 0.8,
+  shuffle: false,
+  repeatOne: false,
   currentSong: null,
   color: "rgb(60,60,60)",
   darkColor: "rgb(30,30,30)",
@@ -83,6 +87,9 @@ const playerSlice = createSlice({
     togglePlay: (state) => {
       state.isPlaying = !state.isPlaying;
     },
+    stopPlayback: (state) => {
+      state.isPlaying = false;
+    },
     setPlayerColor: (state, action) => {
       state.color = action.payload.color
       state.darkColor = action.payload.darkColor
@@ -105,6 +112,12 @@ const playerSlice = createSlice({
       state.isPlaying = true;
     },
 
+    toggleShuffle: (state) => {
+      state.shuffle = !state.shuffle;
+    },
+    toggleRepeatOne: (state) => {
+      state.repeatOne = !state.repeatOne;
+    },
     setVolume: (state, action: PayloadAction<number>) => {
       state.volume = action.payload;
     },
@@ -140,9 +153,12 @@ const playerSlice = createSlice({
 export const {
   setQueue,
   togglePlay,
+  stopPlayback,
   playNext,
   playPrev,
   setVolume,
+  toggleShuffle,
+  toggleRepeatOne,
   setTimeData,
   setPlayerColor,
   setVideoPlaying,

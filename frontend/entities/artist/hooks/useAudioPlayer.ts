@@ -16,8 +16,8 @@ import {
 } from "@/redux/services/artistApislice";
 
 import {
-  playNext,
-  playPrev,
+  setQueue,
+  stopPlayback,
 } from "@/redux/features/playerSlice";
 
 import {
@@ -88,6 +88,8 @@ export const useAudioPlayer = () => {
     currentIndex,
     isPlaying,
     volume,
+    shuffle,
+    repeatOne,
   } = useAppSelector(
     (state) => state.player
   );
@@ -450,6 +452,23 @@ export const useAudioPlayer = () => {
    * --------------------------------------------------
    */
 
+  const nextQueueIndex = useCallback(() => {
+    if (queue.length <= 1) return 0;
+    const offset = shuffle ? 1 + Math.floor(Math.random() * (queue.length - 1)) : 1;
+    return (currentIndex + offset) % queue.length;
+  }, [queue.length, currentIndex, shuffle]);
+
+  const restartCurrentSong = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio?.getAttribute("src")) return;
+    audio.currentTime = 0;
+    try {
+      await audio.play();
+    } catch (error) {
+      console.error("Could not replay the track:", error);
+    }
+  }, []);
+
   const handleSongEnded = useCallback(async () => {
     listenTracker.onSongEnd();
   
@@ -483,9 +502,15 @@ export const useAudioPlayer = () => {
      * تا اولین آهنگ باز پیدا شود.
      */
   
-    const nextIndex =
-      (currentIndex + 1) % queue.length;
-  
+    if (repeatOne) {
+      await restartCurrentSong();
+      return;
+    }
+    if (queue.length === 1) {
+      dispatch(stopPlayback());
+      return;
+    }
+    const nextIndex = nextQueueIndex();
     const playableIndex =
       await findPlayableSongIndex(
         nextIndex,
@@ -518,7 +543,9 @@ export const useAudioPlayer = () => {
   
   }, [
     queue,
-    currentIndex,
+    nextQueueIndex,
+    repeatOne,
+    restartCurrentSong,
     listenTracker,
     advertisementController,
     playerAds,
@@ -645,10 +672,8 @@ export const useAudioPlayer = () => {
     }
   
   
-    const nextIndex =
-      (currentIndex + 1) % queue.length;
-  
-  
+    if (!queue.length) return;
+    const nextIndex = nextQueueIndex();
     const playableIndex =
       await findPlayableSongIndex(
         nextIndex,
@@ -670,7 +695,7 @@ export const useAudioPlayer = () => {
   
   },[
     queue,
-    currentIndex,
+    nextQueueIndex,
     handleSkipAd,
     findPlayableSongIndex,
     dispatch
@@ -780,9 +805,16 @@ export const useAudioPlayer = () => {
         return;
       }
 
-      const nextIndex =
-        (currentIndex + 1) %
-        queue.length;
+      if (repeatOne) {
+        await restartCurrentSong();
+        return;
+      }
+      if (queue.length === 1) {
+        dispatch(stopPlayback());
+        return;
+      }
+
+      const nextIndex = nextQueueIndex();
 
       const playableIndex =
         await findPlayableSongIndex(
@@ -816,36 +848,16 @@ export const useAudioPlayer = () => {
      * --------------------------------------------------
      */
 
-    if (
-      action === "next"
-    ) {
-      dispatch(
-        playNext()
-      );
-
-      return;
-    }
-
-    /*
-     * --------------------------------------------------
-     * Previous
-     * --------------------------------------------------
-     */
-
-    if (
-      action === "previous"
-    ) {
-      dispatch(
-        playPrev()
-      );
-
-      return;
+    if ((action === "next" || action === "previous") && queue.length) {
+      const startIndex = action === "next"
+        ? nextQueueIndex()
+        : (currentIndex - 1 + queue.length) % queue.length;
+      const playable = await findPlayableSongIndex(startIndex, action);
+      if (playable !== null) dispatch(setQueue({ songs: queue, startIndex: playable }));
     }
   }, [
-    queue,
-    currentIndex,
-    findPlayableSongIndex,
-    dispatch,
+    queue, currentIndex, nextQueueIndex, repeatOne, restartCurrentSong,
+    findPlayableSongIndex, dispatch,
   ]);
 
   /*

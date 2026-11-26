@@ -1,70 +1,41 @@
-import requests
+import tempfile
+import unittest
+from pathlib import Path
 
-url = "http://127.0.0.1:8001/recommend"
+from fastapi.testclient import TestClient
 
-payload = {
-    "user": {
-        "user_id": 1
-    },
-    "songs": [
-        {
-            "song_id": 3,
-            "popularity": 50,
-            "tempo": 120,
-            "energy": 0.8,
-            "danceability": 0.7,
-            "valence": 0.6,
-            "acousticness": 0.2,
-            "unique_listeners": 100,
-            "play_count": 200,
-            "total_listen_time": 5000,
-            "plays_last_24h": 30,
-            "song_age_days": 10,
-            "interaction": {
-                "play_count": 5,
-                "total_listen_time": 300,
-                "avg_listen_time": 60,
-                "skip_count": 0,
-                "skip_rate": 0,
-                "completed_count": 3,
-                "completion_rate": 0.6,
-                "engagement_score": 0.8
-            }
-        },
-        {
-            "song_id": 4,
-            "popularity": 20,
-            "tempo": 110,
-            "energy": 0.4,
-            "danceability": 0.5,
-            "valence": 0.3,
-            "acousticness": 0.5,
-            "unique_listeners": 20,
-            "play_count": 30,
-            "total_listen_time": 500,
-            "plays_last_24h": 5,
-            "song_age_days": 20,
-            "interaction": {
-                "play_count": 0,
-                "total_listen_time": 0,
-                "avg_listen_time": 0,
-                "skip_count": 0,
-                "skip_rate": 0,
-                "completed_count": 0,
-                "completion_rate": 0,
-                "engagement_score": 0
-            }
-        }
-    ]
-}
+from .main import app
+from .recommender import RecommendationEngine
+from .schemas import SongFeatures, UserFeatures
 
-session = requests.Session()
-session.trust_env = False
 
-response = session.post(
-    url,
-    json=payload,
-)
-print("STATUS:", response.status_code)
-print("RESPONSE:")
-print(response.text)
+class RecommendationTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_repository_model_loads_and_scores_minimal_input(self):
+        health = self.client.get("/health")
+        self.assertTrue(health.json()["model_loaded"])
+        response = self.client.post(
+            "/recommend", json={"user": {"user_id": 1}, "songs": [{"song_id": 2}]}
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()["recommendations"][0]
+        self.assertEqual(result["song_id"], 2)
+        self.assertGreaterEqual(result["score"], 0)
+
+    def test_invalid_input_returns_422(self):
+        response = self.client.post("/recommend", json={"user": {"user_id": 1}, "songs": [{}]})
+        self.assertEqual(response.status_code, 422)
+
+    def test_missing_and_corrupt_files_keep_fallback_working(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "ml.joblib"
+            for corrupt in (False, True):
+                with self.subTest(corrupt=corrupt):
+                    if corrupt:
+                        path.write_bytes(b"invalid model")
+                    engine = RecommendationEngine(path)
+                    self.assertIsNone(engine.model)
+                    ranked = engine.recommend(UserFeatures(user_id=1), [SongFeatures(song_id=2)])
+                    self.assertEqual(ranked[0]["song_id"], 2)

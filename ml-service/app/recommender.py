@@ -1,10 +1,15 @@
+import logging
+import os
 from pathlib import Path
 
 import joblib
 import numpy as np
 
 
-MODEL_PATH = Path("/app/models/recommender.joblib")
+logger = logging.getLogger(__name__)
+MODEL_PATH = Path(os.getenv(
+    "MILIFY_ML_MODEL_PATH", str(Path(__file__).resolve().parents[1] / "models" / "recommender.joblib")
+))
 
 
 FEATURE_NAMES = [
@@ -67,56 +72,26 @@ FEATURE_NAMES = [
 
 class RecommendationEngine:
 
-    def __init__(self):
-
+    def __init__(self, model_path=MODEL_PATH):
         self.model = None
         self.feature_names = FEATURE_NAMES.copy()
-
-        if not MODEL_PATH.exists():
+        if not model_path.is_file():
+            logger.warning("Recommendation model is missing; fallback ranking enabled")
             return
 
-        package = joblib.load(
-            MODEL_PATH
-        )
-
-        if isinstance(package, dict):
-
-            self.model = package["model"]
-
-            self.feature_names = package.get(
-                "feature_names",
-                FEATURE_NAMES,
-            )
-
-        else:
-
-            self.model = package
-
-        # -------------------------------------------------
-        # Validate model features
-        # -------------------------------------------------
-
-        if len(self.feature_names) != len(
-            FEATURE_NAMES
-        ):
-            raise ValueError(
-                "Model feature count mismatch: "
-                f"model={len(self.feature_names)}, "
-                f"service={len(FEATURE_NAMES)}"
-            )
-
-        if list(self.feature_names) != list(
-            FEATURE_NAMES
-        ):
-            raise ValueError(
-                "Model feature order mismatch.\n"
-                f"Model features: {self.feature_names}\n"
-                f"Service features: {FEATURE_NAMES}"
-            )
-
-    # =====================================================
-    # NORMALIZE
-    # =====================================================
+        try:
+            package = joblib.load(model_path)
+            if isinstance(package, dict):
+                model = package["model"]
+                features = package.get("feature_names", FEATURE_NAMES)
+            else:
+                model = package
+                features = FEATURE_NAMES
+            if list(features) != FEATURE_NAMES or not callable(getattr(model, "predict_proba", None)):
+                raise ValueError("Invalid recommendation model or feature order")
+            self.model = model
+        except Exception as error:
+            logger.error("Recommendation model could not be loaded (%s)", type(error).__name__)
 
     @staticmethod
     def normalize(values):
@@ -340,12 +315,13 @@ class RecommendationEngine:
 
         for song in songs:
 
-            model_score = (
-                self.predict_song_score(
-                    song,
-                    user,
-                )
-            )
+            try:
+                model_score = self.predict_song_score(song, user)
+                if model_score is not None and not np.isfinite(model_score):
+                    model_score = None
+            except (ValueError, TypeError, IndexError, RuntimeError) as error:
+                logger.warning("Recommendation prediction failed (%s)", type(error).__name__)
+                model_score = None
 
             if model_score is None:
 

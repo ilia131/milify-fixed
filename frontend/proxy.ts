@@ -59,7 +59,7 @@ export async function proxy(request: NextRequest) {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const apiUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
 
       if (!apiUrl) {
         console.error("NEXT_PUBLIC_API_URL is not defined");
@@ -114,7 +114,7 @@ export async function proxy(request: NextRequest) {
       response.cookies.set("access", data.access, {
         path: "/",
         sameSite: "lax",
-        httpOnly: false,
+        httpOnly: true,
         secure: process.env.NODE_ENV === "production",
       });
 
@@ -123,7 +123,7 @@ export async function proxy(request: NextRequest) {
         response.cookies.set("refresh", data.refresh, {
           path: "/",
           sameSite: "lax",
-          httpOnly: false,
+          httpOnly: true,
           secure: process.env.NODE_ENV === "production",
         });
       }

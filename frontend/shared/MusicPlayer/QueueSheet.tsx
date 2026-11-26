@@ -261,7 +261,7 @@ const QueueSheet = ({
 
             <p className="mt-2 max-w-xs text-sm text-zinc-500">
               Add songs to your queue and
-              they'll appear here.
+              they&apos;ll appear here.
             </p>
           </div>
         </div>

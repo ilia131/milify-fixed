@@ -621,6 +621,12 @@ class AdminAdvertisementStatsView(
 
             "stats": {
 
+                "charged_amount": (
+                    impressions.aggregate(total=Sum("charged_amount"))["total"] or Decimal("0")
+                ) + (
+                    clicks.aggregate(total=Sum("charged_amount"))["total"] or Decimal("0")
+                ),
+                "currency": "IRT",
                 "impressions":
                     impression_count,
 

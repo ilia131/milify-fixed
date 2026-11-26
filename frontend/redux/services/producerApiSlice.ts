@@ -392,18 +392,8 @@ export const ProducerApiSlice =
           : undefined,
       }),
     
-      transformResponse: (response: any) => {
-    
-        if (Array.isArray(response)) {
-          return response;
-        }
-    
-        if (Array.isArray(response?.results)) {
-          return response.results;
-        }
-    
-        return [];
-      },
+      transformResponse: (response: ProducerProfile[] | { results?: ProducerProfile[] }) =>
+        Array.isArray(response) ? response : response?.results ?? [],
     
       providesTags: ["Producers"],
     }),

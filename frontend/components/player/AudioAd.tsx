@@ -81,7 +81,7 @@ export default function AudioAd({
       0;
 
     const percentage =
-      currentDuration > 0
+      completed ? 100 : currentDuration > 0
         ? Math.min(
             100,
             Math.floor(
@@ -94,7 +94,7 @@ export default function AudioAd({
       await registerImpression({
         ad_id: ad.id,
         session_id: sessionIdRef.current,
-        watched_seconds: Math.floor(elapsed),
+        watched_seconds: Math.floor(completed ? currentDuration : elapsed),
         watched_percentage: percentage,
         completed,
       }).unwrap();

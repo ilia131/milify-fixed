@@ -1,5 +1,7 @@
 "use client";
 
+import { getApiError } from "@/utils/apiError";
+
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,10 +74,9 @@ const Trackpacks = () => {
       );
 
       ;
-    } catch (error: any) {
+    } catch (error) {
       const message =
-        error?.data?.message ||
-        "Insufficient balance.";
+        getApiError(error, "Insufficient balance.", ["message"]);
 
       toast.error(message);
     }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useGetArtistSongsQuery } from "@/redux/services/artistContentApiSlice";
+import { useEffect, useMemo } from "react";
+import { useArtistSongPagesInfiniteQuery } from "@/redux/services/artistContentApiSlice";
 import { useParams, useRouter } from "next/navigation";
 import MusicRowCard from "@/components/Artist/ArtistTabs/MusicRowCard";
-import { Song, setQueue, togglePlay } from "@/redux/features/playerSlice";
+import { setQueue, togglePlay } from "@/redux/features/playerSlice";
 import { useAppDispatch, useAppSelector } from "@/redux/hook";
 import { useInView } from "react-intersection-observer";
 
@@ -16,49 +16,24 @@ export default function ArtistSongsPage() {
 
   const dispatch = useAppDispatch();
 
-  const [cursor, setCursor] = useState<string | null>(null);
-
   const { ref, inView } = useInView({
     threshold: 0,
   });
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-  } = useGetArtistSongsQuery({
-    artistname,
-    cursor,
-  });
+  const { data, isLoading, isFetching, hasNextPage, fetchNextPage, isError } =
+    useArtistSongPagesInfiniteQuery(artistname);
 
-  const songs: Song[] = useMemo(
-    () => data?.results ?? [],
-    [data?.results]
-  );
+  const songs = useMemo(() => data?.pages.flatMap((page) => page.results) ?? [], [data]);
+
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetching && !isError) void fetchNextPage();
+  }, [inView, hasNextPage, isFetching, isError, fetchNextPage]);
 
   const firstSong = songs[0];
 
   const { queue, isPlaying } = useAppSelector(
     (state) => state.player
   );
-
-  /*
-   * Load next page
-   */
-  useEffect(() => {
-    if (!inView || !data?.next || isFetching) return;
-
-    const nextCursor = new URL(data.next).searchParams.get("cursor");
-
-    if (nextCursor && nextCursor !== cursor) {
-      setCursor(nextCursor);
-    }
-  }, [
-    inView,
-    data?.next,
-    isFetching,
-    cursor,
-  ]);
 
   /*
    * Check if current queue belongs to this page

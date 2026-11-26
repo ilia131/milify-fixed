@@ -2,6 +2,8 @@ import uuid
 
 import requests
 from django.conf import settings
+from django.db import IntegrityError, transaction
+from rest_framework.authentication import SessionAuthentication
 from djoser.views import UserViewSet
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -25,7 +27,11 @@ class ListenerViewSet(UserViewSet):
     lookup_value_regex = r"[0-9]+"
 
     def get_throttles(self):
-        self.throttle_scope = "registration" if self.action == "create" else None
+        self.throttle_scope = {
+            "create": "registration",
+            "reset_password": "password_reset",
+            "reset_password_confirm": "password_reset",
+        }.get(self.action)
         return [*super().get_throttles(), ScopedRateThrottle()]
 
 
@@ -187,44 +193,38 @@ class GoogleTokenLoginView(APIView):
         # FIND USER
         # =====================================================
 
-        user = UserListener.objects.filter(
-            email=email
-        ).first()
-
+        user = UserListener.objects.filter(email=email).first()
         created = False
-
-        # =====================================================
-        # CREATE GOOGLE USER
-        # =====================================================
-
         if user is None:
-
-            base_username = email.split("@")[0]
-
+            base_username = email.split("@")[0][:120]
             username = base_username
-
-            while UserListener.objects.filter(
-                username=username
-            ).exists():
-
-                username = (
-                    f"{base_username}_"
-                    f"{uuid.uuid4().hex[:6]}"
-                )
-
-            user = UserListener.objects.create_user(
-                email=email,
-                username=username,
-                first_name=first_name,
-                last_name=last_name,
-            )
-
-            created = True
+            if UserListener.objects.filter(username=username).exists():
+                username = f"{base_username}_{uuid.uuid4().hex[:16]}"
+            try:
+                with transaction.atomic():
+                    user = UserListener.objects.create_user(
+                        email=email, username=username,
+                        first_name=first_name[:150], last_name=last_name[:150],
+                    )
+                    created = True
+            except IntegrityError:
+                user = UserListener.objects.filter(email=email).first()
+                if user is None:
+                    return Response(
+                        {"detail": "Could not create the account. Please retry."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
         if not user.is_active:
             return Response(
                 {"detail": "This account is inactive."},
                 status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if user.has_usable_password():
+            return Response(
+                {"detail": "Sign in with the existing account password."},
+                status=status.HTTP_409_CONFLICT,
             )
 
         # =====================================================
@@ -238,7 +238,7 @@ class GoogleTokenLoginView(APIView):
         # RESPONSE
         # =====================================================
 
-        return Response(
+        response = Response(
             {
                 "access": str(access),
                 "refresh": str(refresh),
@@ -255,8 +255,9 @@ class GoogleTokenLoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-
+        set_token_cookie(response, "access", str(access), settings.AUTH_COOKIE_ACCESS_MAX_AGE)
+        set_token_cookie(response, "refresh", str(refresh), settings.AUTH_COOKIE_REFRESH_MAX_AGE)
+        return response
 
 
 class GoogleProfileCompletionView(APIView):
@@ -295,6 +296,7 @@ class CustomTokenRefreshView(TokenRefreshView):
         data = kwargs.get("data")
         cookie = self.request.COOKIES.get("refresh")
         if data is not None and not data.get("refresh") and cookie:
+            SessionAuthentication().enforce_csrf(self.request)
             kwargs["data"] = {"refresh": cookie}
         return super().get_serializer(*args, **kwargs)
 
@@ -318,7 +320,10 @@ class CustomTokenVerifyView(TokenVerifyView):
 
 class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
-        token = request.data.get("refresh") or request.COOKIES.get("refresh")
+        token = request.data.get("refresh")
+        if not token and request.COOKIES.get("refresh"):
+            SessionAuthentication().enforce_csrf(request)
+            token = request.COOKIES["refresh"]
         if isinstance(token, str):
             try:
                 RefreshToken(token).blacklist()

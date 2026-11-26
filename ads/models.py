@@ -73,8 +73,8 @@ class Campaign(models.Model):
     )
 
     spent = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+        max_digits=17,
+        decimal_places=7,
         default=0
     )
 
@@ -248,6 +248,8 @@ class AdImpression(models.Model):
         default=False
     )
 
+    charged_amount = models.DecimalField(max_digits=17, decimal_places=7, default=0)
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
@@ -290,6 +292,8 @@ class AdClick(models.Model):
         blank=True,
         db_index=True
     )
+
+    charged_amount = models.DecimalField(max_digits=17, decimal_places=7, default=0)
 
     created_at = models.DateTimeField(
         auto_now_add=True

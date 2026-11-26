@@ -193,7 +193,7 @@ export default function RegisterPage() {
     try {
       const { email, password } = formData;
       const tokens = await login({ email: email.toLowerCase(), password }).unwrap();
-      saveSession(tokens, dispatch);
+      await saveSession(tokens, dispatch);
       success("ثبت‌نام موفق بود.");
       replace("/browse");
     } catch {

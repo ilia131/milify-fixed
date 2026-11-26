@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useShortVideoLikeMutation } from "@/redux/services/shortApi";
 import { useToast } from "@/components/ToastProvider/ToastProvider";
 import type { Shorts } from "@/redux/services/artistApislice";
@@ -16,36 +16,23 @@ export function useVideoLikes(
   const { error: showError } = useToast();
   const [shortVideoLike] = useShortVideoLikeMutation();
 
-  const [likedVideos, setLikedVideos] = useState<
+  const [likedOverrides, setLikedVideos] = useState<
     Record<string, boolean>
   >({});
-  const [likeCounts, setLikeCounts] = useState<
+  const [countOverrides, setLikeCounts] = useState<
     Record<string, number>
   >({});
   const [showLikeAnimation, setShowLikeAnimation] =
     useState(false);
 
-  // Sync from API detail only once per uuid
-  useEffect(() => {
-    if (!currentVideo || !detail) return;
-
-    const uuid = currentVideo.uuid;
-
-    const liked = Boolean(
-      detail.is_liked ?? detail.liked ?? false
-    );
-    const count = Math.max(0, Number(detail.likes_count ?? 0));
-
-    setLikedVideos((prev) => {
-      if (prev[uuid] !== undefined) return prev;
-      return { ...prev, [uuid]: liked };
-    });
-
-    setLikeCounts((prev) => {
-      if (prev[uuid] !== undefined) return prev;
-      return { ...prev, [uuid]: count };
-    });
-  }, [currentVideo?.uuid, detail]);
+  const likedVideos = currentVideo ? {
+    [currentVideo.uuid]: Boolean(detail?.is_liked ?? detail?.liked),
+    ...likedOverrides,
+  } : likedOverrides;
+  const likeCounts = currentVideo ? {
+    [currentVideo.uuid]: Math.max(0, Number(detail?.likes_count ?? 0)),
+    ...countOverrides,
+  } : countOverrides;
 
   const handleLike = async (uuid: string, forceLike = false) => {
     const currentlyLiked = likedVideos[uuid] ?? false;

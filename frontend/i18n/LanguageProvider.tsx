@@ -4,7 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
-  useState,
+  useSyncExternalStore,
 } from "react";
 
 import fa from "./messages/fa.json";
@@ -27,20 +27,28 @@ type LanguageContextType = {
 const LanguageContext =
   createContext<LanguageContextType | null>(null);
 
+const LOCALE_KEY = "milify-locale";
+const localeChanged = "milify-locale-changed";
+
+function subscribeLocale(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener(localeChanged, listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener(localeChanged, listener);
+  };
+}
+
+function getLocale(): Locale {
+  return localStorage.getItem(LOCALE_KEY) === "en" ? "en" : "fa";
+}
+
 export function LanguageProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [locale, setLocaleState] = useState<Locale>("fa");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("milify-locale");
-
-    if (saved === "fa" || saved === "en") {
-      setLocaleState(saved);
-    }
-  }, []);
+  const locale = useSyncExternalStore(subscribeLocale, getLocale, (): Locale => "fa");
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -53,11 +61,8 @@ export function LanguageProvider({
   }, [locale]);
 
   const setLocale = (newLocale: Locale) => {
-    setLocaleState(newLocale);
-    localStorage.setItem(
-      "milify-locale",
-      newLocale
-    );
+    localStorage.setItem(LOCALE_KEY, newLocale);
+    window.dispatchEvent(new Event(localeChanged));
   };
 
   const toggleLocale = () => {
@@ -67,13 +72,14 @@ export function LanguageProvider({
   const t = (key: string) => {
     const keys = key.split(".");
 
-    let value: any = messages[locale];
+    let value: unknown = messages[locale];
 
     for (const k of keys) {
-      value = value?.[k];
+      if (!value || typeof value !== "object" || !Object.hasOwn(value, k)) return key;
+      value = (value as Record<string, unknown>)[k];
     }
 
-    return value ?? key;
+    return typeof value === "string" ? value : key;
   };
 
   return (

@@ -1,7 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class UserSongInteractionFeatures(BaseModel):
+class FiniteFeatures(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+
+class UserSongInteractionFeatures(FiniteFeatures):
     play_count: int = 0
     total_listen_time: int = 0
     avg_listen_time: float = 0.0
@@ -12,7 +16,7 @@ class UserSongInteractionFeatures(BaseModel):
     engagement_score: float = 0.0
 
 
-class UserTasteProfile(BaseModel):
+class UserTasteProfile(FiniteFeatures):
     avg_tempo: float = 120.0
     avg_energy: float = 0.5
     avg_danceability: float = 0.5
@@ -25,7 +29,7 @@ class UserTasteProfile(BaseModel):
     avg_skip_rate: float = 0.0
 
 
-class SongFeatures(BaseModel):
+class SongFeatures(FiniteFeatures):
     song_id: int
 
     popularity: float = 0.0

@@ -26,8 +26,8 @@ class AdvertiserSerializer(serializers.ModelSerializer):
 class CampaignSerializer(serializers.ModelSerializer):
 
     remaining_budget = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+        max_digits=17,
+        decimal_places=7,
         read_only=True
     )
 

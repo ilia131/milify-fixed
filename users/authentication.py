@@ -1,24 +1,25 @@
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.conf import settings
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import SAFE_METHODS
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
+
 
 class CustomJWTAuthentication(JWTAuthentication):
-    def authenticate(self , request):
-         
-       try:
-           
-           header = self.get_header(request)
-           
-           if header is None:
-               raw_token = request.COOKIES.get(settings.AUTH_COOKIE)
-            
-           else:
-                raw_token = self.get_raw_token(header)    
+    def authenticate(self, request):
+        if self.get_header(request) is not None:
+            return super().authenticate(request)
 
-           if raw_token is None:
-              return None
+        raw_token = request.COOKIES.get(settings.AUTH_COOKIE)
+        if not raw_token:
+            return None
 
-           validated_token = self.get_validated_token(raw_token)
+        try:
+            validated_token = self.get_validated_token(raw_token)
+            user = self.get_user(validated_token)
+        except (InvalidToken, AuthenticationFailed):
+            return None
 
-           return self.get_user(validated_token), validated_token
-       except :
-         return None 
+        if request.method not in SAFE_METHODS:
+            SessionAuthentication().enforce_csrf(request)
+        return user, validated_token

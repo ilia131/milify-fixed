@@ -1,7 +1,9 @@
+from django.core.files.storage import storages
+from django.http import HttpResponseRedirect
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 
-from rest_framework import generics, filters, status
+from rest_framework import generics, filters, serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,7 +27,7 @@ from subscriptions.models import (
     WalletTransaction,
 )
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import transaction
@@ -127,6 +129,11 @@ class StreamPurchasedBeatView(APIView):
         try:
 
             path = license_obj.audio_file.path
+
+        except NotImplementedError:
+            response = HttpResponseRedirect(storages["private_tracks"].url(license_obj.audio_file.name))
+            response["Cache-Control"] = "private, no-store"
+            return response
 
         except (ValueError, AttributeError):
 
@@ -674,7 +681,7 @@ class BuyBeatView(APIView):
                     "producer",
                     "producer__user",
                 )
-                .select_for_update()
+                .select_for_update(of=("self",))
                 .get(
                     id=beat_id,
                     is_active=True,
@@ -708,18 +715,9 @@ class BuyBeatView(APIView):
         # LICENSE
         # =====================================================
 
-        license_id = request.data.get(
-            "license_id"
+        license_id = serializers.IntegerField(min_value=1).run_validation(
+            request.data.get("license_id")
         )
-
-        if not license_id:
-
-            return Response(
-                {
-                    "detail": "license_id الزامی است."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         try:
 
@@ -765,69 +763,14 @@ class BuyBeatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # =====================================================
-        # BUYER WALLET
-        # =====================================================
-        #
-        # اگر Wallet وجود نداشته باشد،
-        # به صورت خودکار ساخته می‌شود.
-        #
-
-        buyer_wallet, buyer_wallet_created = (
-            Wallet.objects
-            .get_or_create(
-                user=request.user,
-                defaults={
-                    "balance": Decimal("0")
-                },
-            )
-        )
-
-        # =====================================================
-        # LOCK BUYER WALLET
-        # =====================================================
-
-        buyer_wallet = (
-            Wallet.objects
-            .select_for_update()
-            .get(
-                pk=buyer_wallet.pk
-            )
-        )
-
-        # =====================================================
-        # PRODUCER
-        # =====================================================
-
         producer = beat.producer
-
-        producer_user = producer.user
-
-        # =====================================================
-        # PRODUCER WALLET
-        # =====================================================
-
-        producer_wallet, producer_wallet_created = (
-            Wallet.objects
-            .get_or_create(
-                user=producer_user,
-                defaults={
-                    "balance": Decimal("0")
-                },
-            )
-        )
-
-        # =====================================================
-        # LOCK PRODUCER WALLET
-        # =====================================================
-
-        producer_wallet = (
-            Wallet.objects
-            .select_for_update()
-            .get(
-                pk=producer_wallet.pk
-            )
-        )
+        wallet_users = sorted([request.user.pk, producer.user_id])
+        wallets = {}
+        for user_id in wallet_users:
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user_id=user_id)
+            wallets[user_id] = wallet
+        buyer_wallet = wallets[request.user.pk]
+        producer_wallet = wallets[producer.user_id]
 
         # =====================================================
         # PRICE
@@ -901,10 +844,8 @@ class BuyBeatView(APIView):
         # CALCULATE REVENUE
         # =====================================================
 
-        platform_fee = (
-            price *
-            fee_percent /
-            Decimal("100")
+        platform_fee = (price * fee_percent / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
         producer_revenue = (
@@ -1056,21 +997,9 @@ class BuyBeatView(APIView):
         # UPDATE PRODUCER STATISTICS
         # =====================================================
 
-        producer.total_sales = (
-            producer.total_sales +
-            1
-        )
-
-        producer.total_revenue = (
-            producer.total_revenue +
-            producer_revenue
-        )
-
-        producer.save(
-            update_fields=[
-                "total_sales",
-                "total_revenue",
-            ]
+        ProducerProfile.objects.filter(pk=producer.pk).update(
+            total_sales=F("total_sales") + 1,
+            total_revenue=F("total_revenue") + producer_revenue,
         )
 
         # =====================================================
@@ -1279,7 +1208,7 @@ class DownloadBeatView(APIView):
 
                 "audio_file": (
                     request.build_absolute_uri(
-                        purchase.license.audio_file.url
+                        storages["private_tracks"].url(purchase.license.audio_file.name)
                     )
                 ),
             }

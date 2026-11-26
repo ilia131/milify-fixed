@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+from .billing import bill_event
 from .models import (
     Advertiser,
     Campaign,
@@ -159,18 +160,30 @@ class AdImpressionView(APIView):
         session_id = progress.pop("session_id")
 
         impression = AdImpression.objects.filter(ad=ad, user=user, session_id=session_id).first()
+        valid_view = (
+            ad.ad_type == "VIDEO"
+            and ad.duration > 0
+            and progress["completed"]
+            and progress["watched_percentage"] == 100
+            and progress["watched_seconds"] >= ad.duration
+        )
         if impression is None:
+            charge = bill_event(ad, "impression") + bill_event(ad, "view", valid_view=valid_view)
             impression = AdImpression.objects.create(
-                ad=ad, user=user, session_id=session_id, **progress
+                ad=ad, user=user, session_id=session_id, charged_amount=charge, **progress
             )
             response_status = status.HTTP_201_CREATED
         else:
+            if not impression.charged_amount and valid_view:
+                impression.charged_amount = bill_event(ad, "view", valid_view=True)
             impression.watched_seconds = max(impression.watched_seconds, progress["watched_seconds"])
             impression.watched_percentage = max(
                 impression.watched_percentage, progress["watched_percentage"]
             )
             impression.completed = impression.completed or progress["completed"]
-            impression.save(update_fields=["watched_seconds", "watched_percentage", "completed"])
+            impression.save(update_fields=[
+                "watched_seconds", "watched_percentage", "completed", "charged_amount",
+            ])
             response_status = status.HTTP_200_OK
 
         return Response(
@@ -189,7 +202,9 @@ class AdClickView(APIView):
 
         click = AdClick.objects.filter(ad=ad, user=user, session_id=session_id).first()
         if click is None:
-            click = AdClick.objects.create(ad=ad, user=user, session_id=session_id)
+            click = AdClick.objects.create(
+                ad=ad, user=user, session_id=session_id, charged_amount=bill_event(ad, "click")
+            )
             response_status = status.HTTP_201_CREATED
         else:
             response_status = status.HTTP_200_OK

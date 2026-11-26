@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
 
     const refresh =
-      body.refresh || request.cookies.get("refresh")?.value;
+      request.cookies.get("refresh")?.value || body.refresh;
 
     if (typeof refresh !== "string" || !refresh) {
       return NextResponse.json(

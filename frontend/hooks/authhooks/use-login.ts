@@ -9,37 +9,20 @@ interface LoginFormData {
   password: string;
 }
 
-const setCookie = (
-  name: string,
-  value: string,
-  days = 1
-) => {
-  const date = new Date();
-
-  date.setTime(
-    date.getTime() +
-      days * 24 * 60 * 60 * 1000
-  );
-
-  const expires =
-    "expires=" + date.toUTCString();
-
-  document.cookie =
-    `${name}=${value}; ${expires}; path=/`;
-};
-
-export function saveSession(
+export async function saveSession(
   { access, refresh }: { access: string; refresh: string },
   dispatch: ReturnType<typeof useAppDispatch>
 ) {
-  if (!access || !refresh) {
-    throw new Error("توکن دریافت نشد");
-  }
+  if (!access || !refresh) throw new Error("توکن دریافت نشد");
 
+  const response = await fetch("/api/auth/set-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ access, refresh }),
+  });
+  if (!response.ok) throw new Error("نشست ایجاد نشد");
   localStorage.setItem("access", access);
   localStorage.setItem("refresh", refresh);
-  setCookie("access", access);
-  setCookie("refresh", refresh);
   dispatch(setAuth({ access, refresh }));
 }
 
@@ -64,7 +47,7 @@ export default function useLogin() {
         password,
       }).unwrap();
 
-      saveSession(result, dispatch);
+      await saveSession(result, dispatch);
 
       // -------------------------
       // Success

@@ -28,43 +28,14 @@ const Clip = ({
   const [activeIndex, setActiveIndex] =
     useState<number | null>(null);
 
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [renderCount, setRenderCount] = useState(4);
-
+  const [expandedLength, setExpandedLength] = useState(0);
   const videos = shortvideo ?? [];
-
-  // =========================================================
-  // Loading simulation / data readiness
-  // =========================================================
+  const isLoading = shortvideo === undefined;
+  const renderCount = expandedLength === videos.length ? videos.length : 4;
 
   useEffect(() => {
-    if (shortvideo !== undefined) {
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-      }, 250);
-
-      return () => clearTimeout(timer);
-    }
-
-    setIsLoading(true);
-  }, [shortvideo]);
-
-  // =========================================================
-  // Progressive rendering
-  // =========================================================
-
-  useEffect(() => {
-    if (!videos.length) return;
-
-    setRenderCount(Math.min(4, videos.length));
-
     if (videos.length <= 4) return;
-
-    const timer = setTimeout(() => {
-      setRenderCount(videos.length);
-    }, 150);
-
+    const timer = setTimeout(() => setExpandedLength(videos.length), 150);
     return () => clearTimeout(timer);
   }, [videos.length]);
 

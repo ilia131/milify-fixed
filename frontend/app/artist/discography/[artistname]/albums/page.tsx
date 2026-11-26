@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useGetArtistAlbumsQuery } from "@/redux/services/artistContentApiSlice";
+import { useEffect, useMemo } from "react";
+import { useArtistAlbumPagesInfiniteQuery } from "@/redux/services/artistContentApiSlice";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { Album } from "@/redux/services/artistApislice";
+import type { Album } from "@/redux/services/artistApislice";
 import Link from "next/link";
 import { useInView } from "react-intersection-observer";
 
@@ -14,45 +14,18 @@ export default function ArtistAlbumsPage() {
 
   const artistname = decodeURIComponent(params.artistname);
 
-  const [cursor, setCursor] = useState<string | null>(null);
-
   const { ref, inView } = useInView({
     threshold: 0,
   });
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-  } = useGetArtistAlbumsQuery({
-    artistname,
-    cursor,
-  });
+  const { data, isLoading, isFetching, hasNextPage, fetchNextPage, isError } =
+    useArtistAlbumPagesInfiniteQuery(artistname);
 
-  const albums: Album[] = useMemo(
-    () => data?.results ?? [],
-    [data?.results]
-  );
+  const albums = useMemo(() => data?.pages.flatMap((page) => page.results) ?? [], [data]);
 
-  /*
-   * Infinite pagination
-   */
   useEffect(() => {
-    if (!inView || !data?.next || isFetching) return;
-
-    const nextCursor = new URL(data.next).searchParams.get(
-      "cursor"
-    );
-
-    if (nextCursor && nextCursor !== cursor) {
-      setCursor(nextCursor);
-    }
-  }, [
-    inView,
-    data?.next,
-    isFetching,
-    cursor,
-  ]);
+    if (inView && hasNextPage && !isFetching && !isError) void fetchNextPage();
+  }, [inView, hasNextPage, isFetching, isError, fetchNextPage]);
 
   /*
    * First album = Hero cover
@@ -505,7 +478,7 @@ export default function ArtistAlbumsPage() {
               </p>
 
               <p className="mt-1 text-[13px] text-[#777]">
-                This artist hasn't released any albums.
+                This artist hasn&apos;t released any albums.
               </p>
             </div>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { getApiError } from "@/utils/apiError";
+
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -66,15 +68,10 @@ export default function SecurityPage() {
       setConfirmPassword("");
 
       setMessage("رمز عبور با موفقیت تغییر کرد.");
-    } catch (error: any) {
-      const apiError =
-        error?.data?.current_password?.[0] ||
-        error?.data?.new_password?.[0] ||
-        error?.data?.confirm_password?.[0] ||
-        error?.data?.detail ||
-        "تغییر رمز عبور انجام نشد.";
-
-      setError(apiError);
+    } catch (error) {
+      setError(getApiError(error, "تغییر رمز عبور انجام نشد.", [
+        "current_password", "new_password", "confirm_password", "detail",
+      ]));
     }
   };
 

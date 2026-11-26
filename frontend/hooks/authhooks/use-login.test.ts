@@ -12,23 +12,24 @@ afterEach(() => {
   document.cookie = "refresh=; Max-Age=0; path=/";
 });
 
-test("persists the JWT session shared by sign-in and registration", () => {
+test("persists the JWT session shared by sign-in and registration", async () => {
   const dispatch = jest.fn();
   const tokens = { access: "test-access", refresh: "test-refresh" };
 
-  saveSession(tokens, dispatch);
+  await saveSession(tokens, dispatch);
 
   expect(localStorage.getItem("access")).toBe(tokens.access);
   expect(localStorage.getItem("refresh")).toBe(tokens.refresh);
-  expect(document.cookie).toContain("access=test-access");
-  expect(document.cookie).toContain("refresh=test-refresh");
+  expect(fetch).toHaveBeenCalledWith("/api/auth/set-token", expect.objectContaining({
+    method: "POST", body: JSON.stringify(tokens),
+  }));
   expect(dispatch).toHaveBeenCalledWith(setAuth(tokens));
 });
 
-test("does not authenticate when the response omits a token", () => {
+test("does not authenticate when the response omits a token", async () => {
   const dispatch = jest.fn();
 
-  expect(() => saveSession({ access: "test-access", refresh: "" }, dispatch)).toThrow();
+  await expect(saveSession({ access: "test-access", refresh: "" }, dispatch)).rejects.toThrow();
 
   expect(localStorage.getItem("access")).toBeNull();
   expect(dispatch).not.toHaveBeenCalled();

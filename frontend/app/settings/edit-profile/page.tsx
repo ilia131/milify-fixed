@@ -1,5 +1,7 @@
 "use client";
 
+import { getApiError } from "@/utils/apiError";
+
 import { useEffect, useRef, useState } from "react";
 import { Vazirmatn } from "next/font/google";
 import Link from "next/link";
@@ -40,22 +42,22 @@ export default function SettingsPage() {
     useRef<HTMLInputElement>(null);
 
   const [
-    username,
+    usernameEdit,
     setUsername,
-  ] = useState("");
+  ] = useState<string | null>(null);
 
   const [
-    firstName,
+    firstNameEdit,
     setFirstName,
-  ] = useState("");
+  ] = useState<string | null>(null);
 
   const [
-    lastName,
+    lastNameEdit,
     setLastName,
-  ] = useState("");
+  ] = useState<string | null>(null);
 
   const [
-    preview,
+    previewEdit,
     setPreview,
   ] = useState<string | null>(null);
 
@@ -69,29 +71,14 @@ export default function SettingsPage() {
     setMessage,
   ] = useState("");
 
+  const username = usernameEdit ?? profile?.username ?? "";
+  const firstName = firstNameEdit ?? profile?.first_name ?? "";
+  const lastName = lastNameEdit ?? profile?.last_name ?? "";
+  const preview = previewEdit ?? profile?.image_url ?? null;
+
   useEffect(() => {
-
-    if (!profile) {
-      return;
-    }
-
-    setUsername(
-      profile.username ?? ""
-    );
-
-    setFirstName(
-      profile.first_name ?? ""
-    );
-
-    setLastName(
-      profile.last_name ?? ""
-    );
-
-    setPreview(
-      profile.image_url ?? null
-    );
-
-  }, [profile]);
+    if (previewEdit) return () => URL.revokeObjectURL(previewEdit);
+  }, [previewEdit]);
 
   const handleImageChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -135,18 +122,11 @@ export default function SettingsPage() {
 
       setSelectedFile(null);
 
-    } catch (error: any) {
+    } catch (error) {
 
       console.error(error);
 
-      const backendMessage =
-        error?.data?.username?.[0] ||
-        error?.data?.detail ||
-        "ذخیره تغییرات ناموفق بود.";
-
-      setMessage(
-        backendMessage
-      );
+      setMessage(getApiError(error, "ذخیره تغییرات ناموفق بود.", ["username", "detail"]));
     }
   };
 

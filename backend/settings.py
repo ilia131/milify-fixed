@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from django.core.exceptions import ImproperlyConfigured
 import os
 from datetime import timedelta
 import dj_database_url
@@ -21,23 +24,38 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+def env_list(name, default=""):
+    return [entry.strip() for entry in os.getenv(name, default).split(",") if entry.strip()]
 
-# SECURITY WARNING: keep the secret key used in production secret!
+
+PRODUCTION = os.getenv("DJANGO_ENV", "development") == "production"
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
+DEBUG = not PRODUCTION and os.getenv("DJANGO_DEBUG", "false").lower() == "true"
+FRONTEND_URL = os.getenv("DJANGO_FRONTEND_URL", "http://localhost:3000").rstrip("/")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "" if PRODUCTION else "localhost,127.0.0.1")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", FRONTEND_URL)
+if PRODUCTION:
+    if len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5 or SECRET_KEY.startswith("django-insecure-"):
+        raise ImproperlyConfigured("Set a strong DJANGO_SECRET_KEY in production")
+    if not ALLOWED_HOSTS or any(host.startswith(("*", ".")) for host in ALLOWED_HOSTS):
+        raise ImproperlyConfigured("Set exact DJANGO_ALLOWED_HOSTS in production")
+    frontend = urlsplit(FRONTEND_URL)
+    if frontend.scheme != "https" or not frontend.hostname or frontend.path:
+        raise ImproperlyConfigured("Set DJANGO_FRONTEND_URL to an HTTPS origin")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
+SECURE_SSL_REDIRECT = PRODUCTION
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "31536000")) if PRODUCTION else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = PRODUCTION
+SECURE_HSTS_PRELOAD = PRODUCTION
+SESSION_COOKIE_SECURE = PRODUCTION
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = PRODUCTION
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
+if PRODUCTION and os.getenv("DJANGO_TRUST_PROXY", "false").lower() == "true":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-
-
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://api.milify.ir",
-    "https://milify.ir",
-]
 # Application definition
 
 INSTALLED_APPS = [
@@ -89,7 +107,7 @@ CORS_ALLOW_METHODS = (
 
 CORS_ALLOW_CREDENTIALS = True
 
-DOMAIN = 'http://localhost:3000/'
+DOMAIN = urlsplit(FRONTEND_URL).netloc
 
 CORS_ALLOW_METHODS = (
     "DELETE",
@@ -202,6 +220,7 @@ REST_FRAMEWORK = {
       
     "DEFAULT_THROTTLE_RATES": {
         "registration": "10/hour",
+        "password_reset": "10/hour",
         "support_anon": "5/hour",
         "support_user": "20/hour",
     },
@@ -221,6 +240,7 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+TRACK2VEC_MODEL_PATH = Path(os.getenv("TRACK2VEC_MODEL_PATH", str(BASE_DIR / "track2vec.model")))
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://ml-service:8001")
 AUTH_COOKIE = 'access'
  
@@ -270,6 +290,8 @@ DJOSER = {
     "SERIALIZERS": {
         "user_create": "users.serializers.CustomUserCreateSerializer",
     },
+    "EMAIL": {"password_reset": "users.email.MilifyPasswordResetEmail"},
+    "PASSWORD_RESET_CONFIRM_RETYPE": True,
     "PASSWORD_RESET_CONFIRM_URL": "reset-password/{uid}/{token}",
     "SOCIAL_AUTH_ALLOWED_REDIRECT_URIS": [
         "https://milify.ir/google/callback",
@@ -304,16 +326,14 @@ AUTH_COOKIE_ACCESS_MAX_AGE = 60 * 60
 AUTH_COOKIE_REFRESH_MAX_AGE = 60 * 60 * 24 * 7  
 
 
-AUTH_COOKIE_SECURE = not DEBUG
+AUTH_COOKIE_SECURE = PRODUCTION
 AUTH_COOKIE_HTTP_ONLY = True
-AUTH_COOKIE_SAMESITE = "Lax" if DEBUG else "None"
+AUTH_COOKIE_SAMESITE = "Lax"
 AUTH_COOKIE_PATH = "/"
 CORS_ALLOW_CREDENTIALS = True
 
 
-CORS_ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:3000,https://milify.ir"
-).split(",")
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", FRONTEND_URL)
 
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -321,6 +341,7 @@ CORS_ALLOW_HEADERS = [
     'authorization', 
     'content-type',
     'origin',
+    'x-csrftoken',
 ]
 
 # Static files (CSS, JavaScript, Images)
@@ -337,12 +358,12 @@ MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.ir-thr-at1.arvanstorage.ir/"
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_TIMEOUT = 10
-DEFAULT_FROM_EMAIL = "no-reply@milify.ir"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL") or "no-reply@milify.ir"
 SERVER_EMAIL = "no-reply@milify.ir"
 EMAIL_USE_SSL = False
 

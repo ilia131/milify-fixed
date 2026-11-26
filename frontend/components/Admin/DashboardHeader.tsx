@@ -9,7 +9,7 @@ export default function DashboardHeader() {
         </h1>
 
         <p className="mt-1 text-sm text-zinc-500">
-          Welcome back. Here's what's happening on Milify.
+          Welcome back. Here&apos;s what&apos;s happening on Milify.
         </p>
       </div>
 

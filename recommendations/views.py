@@ -20,13 +20,25 @@ from music.models import Songs
 from music.serializers import SongPlayerSerializer
 from music.models import Songs
 from .services.fresh_track import get_fresh_tracks
+from functools import lru_cache
+import logging
+
+from django.conf import settings
 from gensim.models import Word2Vec
 import numpy as np
-import os
 from .services.ml.rerank import rerank_songs
 
 
-MODEL_PATH = "track2vec.model"
+logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def load_track2vec(path):
+    try:
+        return Word2Vec.load(str(path))
+    except (OSError, ValueError, AttributeError, EOFError) as error:
+        logger.warning("Track2Vec could not be loaded (%s)", type(error).__name__)
+        return None
 
 
 class Track2VecRecommendView(APIView):
@@ -36,19 +48,15 @@ class Track2VecRecommendView(APIView):
 
     def get(self, request, song_uuid):
 
-        if not os.path.exists(MODEL_PATH):
-            return Response({"error": "Track2Vec model not trained"}, status=500)
-
-        model = Word2Vec.load(MODEL_PATH)
-
         try:
-            song = Songs.objects.prefetch_related("artist").get(unique_id=song_uuid)
+            song = Songs.objects.prefetch_related("artist").get(unique_id=song_uuid, is_published=True)
         except Songs.DoesNotExist:
             return Response({"error": "Song not found"}, status=404)
 
         key = str(song.id)
+        model = load_track2vec(settings.TRACK2VEC_MODEL_PATH)
 
-        if key not in model.wv:
+        if model is None or key not in model.wv:
             return self._fallback(request, song)
 
         try:
@@ -66,7 +74,7 @@ class Track2VecRecommendView(APIView):
         if not ids:
             return self._fallback(request, song)
 
-        queryset = Songs.objects.filter(id__in=ids).prefetch_related("artist")
+        queryset = Songs.objects.filter(id__in=ids, is_published=True).prefetch_related("artist")
 
         id_to_song = {s.id: s for s in queryset}
 
@@ -119,7 +127,7 @@ class Track2VecRecommendView(APIView):
 
         if song.genre:
             results = list(
-                Songs.objects.filter(genre=song.genre)
+                Songs.objects.filter(genre=song.genre, is_published=True)
                 .exclude(id=song.id)
                 .prefetch_related("artist")
                 .order_by("-play_count")[:limit]
@@ -133,7 +141,7 @@ class Track2VecRecommendView(APIView):
         artist_ids = list(song.artist.values_list("id", flat=True))
         if artist_ids:
             results = list(
-                Songs.objects.filter(artist__id__in=artist_ids)
+                Songs.objects.filter(artist__id__in=artist_ids, is_published=True)
                 .exclude(id=song.id)
                 .prefetch_related("artist")
                 .distinct()
@@ -146,7 +154,7 @@ class Track2VecRecommendView(APIView):
                 )
 
         results = list(
-            Songs.objects.exclude(id=song.id)
+            Songs.objects.filter(is_published=True).exclude(id=song.id)
             .prefetch_related("artist")
             .order_by("-play_count")[:limit]
         )

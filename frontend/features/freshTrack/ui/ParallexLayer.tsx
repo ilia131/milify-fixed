@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 
-export default function ParallaxLayer({ children }: any) {
+export default function ParallaxLayer({ children }: { children: React.ReactNode }) {
 
   const [y, setY] = useState(0)
 

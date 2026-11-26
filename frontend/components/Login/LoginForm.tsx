@@ -1,6 +1,7 @@
 "use client";
 
 import { Formik, Form } from "formik";
+import Link from "next/link";
 import * as Yup from "yup";
 
 import OAuthSection from "./OAuthSection";
@@ -63,6 +64,10 @@ const LoginForm = () => {
           <SubmitButton isLoading={isLoading}>
             {t("login.continue")}
           </SubmitButton>
+
+          <Link href="/reset-password" className="block py-3 text-sm underline">
+            رمز عبور را فراموش کرده‌اید؟
+          </Link>
 
           <OAuthSection />
         </Form>

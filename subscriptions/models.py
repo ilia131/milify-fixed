@@ -21,8 +21,8 @@ class Wallet(models.Model):
     )
 
     balance = models.DecimalField(
-        max_digits=12,
-        decimal_places=0,
+        max_digits=14,
+        decimal_places=2,
         default=0,
     )
 

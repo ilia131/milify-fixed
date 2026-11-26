@@ -1,5 +1,7 @@
 "use client";
 
+import { getApiError } from "@/utils/apiError";
+
 import {
   ArrowLeft,
   Check,
@@ -12,7 +14,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -58,7 +59,7 @@ export default function BeatDetailPage() {
      STATE
   ========================================================= */
 
-  const [selectedLicense, setSelectedLicense] =
+  const [requestedLicense, setSelectedLicense] =
     useState<number | null>(null);
 
   const [message, setMessage] = useState<{
@@ -102,14 +103,8 @@ export default function BeatDetailPage() {
      DEFAULT LICENSE
   ========================================================= */
 
-  useEffect(() => {
-    if (
-      licenses.length > 0 &&
-      selectedLicense === null
-    ) {
-      setSelectedLicense(licenses[0].id);
-    }
-  }, [licenses, selectedLicense]);
+  const selectedLicense = licenses.find((license) => license.id === requestedLicense)?.id
+    ?? licenses[0]?.id ?? null;
 
   /* =========================================================
      BUY
@@ -143,13 +138,10 @@ export default function BeatDetailPage() {
           response.message ||
           "Beat purchased successfully.",
       });
-    } catch (error: any) {
+    } catch (error) {
       setMessage({
         type: "error",
-        text:
-          error?.data?.detail ||
-          error?.data?.message ||
-          "Purchase failed.",
+        text: getApiError(error, "Purchase failed."),
       });
     }
   }
@@ -189,13 +181,10 @@ export default function BeatDetailPage() {
         "_blank",
         "noopener,noreferrer"
       );
-    } catch (error: any) {
+    } catch (error) {
       setMessage({
         type: "error",
-        text:
-          error?.data?.detail ||
-          error?.data?.message ||
-          "Download failed.",
+        text: getApiError(error, "Download failed."),
       });
     }
   }
